@@ -1,0 +1,52 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from './queryKeys';
+import { publicPortalApi } from '../../api/publicPortal.api';
+
+// ==================== QUERIES ====================
+
+export function usePublicTenantCms(tenantSlug: string) {
+  return useQuery({
+    queryKey: queryKeys.publicPortal.site(tenantSlug),
+    queryFn: () => publicPortalApi.getTenantCms(tenantSlug),
+    enabled: Boolean(tenantSlug),
+    staleTime: 1000 * 60 * 10, // 10 minutes cache
+  });
+}
+
+export function usePublicTrackShipment(awbNumber: string) {
+  return useQuery({
+    queryKey: queryKeys.courier.tracking(awbNumber),
+    queryFn: () => publicPortalApi.trackShipmentPublic(awbNumber),
+    enabled: Boolean(awbNumber && awbNumber.trim().length > 0),
+    refetchInterval: 15000, // 15-second polling for live parcel tracking
+  });
+}
+
+// ==================== MUTATIONS ====================
+
+export function useSubmitPublicBookingMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: {
+      tenantSlug: string;
+      serviceType: string;
+      senderName: string;
+      senderPhone: string;
+      senderAddress: string;
+      receiverName?: string;
+      receiverPhone?: string;
+      receiverAddress?: string;
+      pickupTime?: string;
+      estimatedWeightKg?: number;
+      notes?: string;
+    }) => publicPortalApi.submitPublicBooking(data),
+    onSuccess: (res) => {
+      if (res.bookingReference) {
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.courier.tracking(res.bookingReference),
+        });
+      }
+    },
+  });
+}
